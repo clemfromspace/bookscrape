@@ -10,9 +10,16 @@ from reportlab.lib.units import inch
 
 
 class PdfExporter(BaseItemExporter):
+    """Exporter to export the crawled items images as a pdf file"""
 
     IMAGE_WIDTH = 7 * inch
     IMAGE_HEIGHT = 9.5 * inch
+
+    output_dir = None
+    images_path = None
+    file_name = None
+    document = None
+    story = None
 
     def __init__(self, output_dir, images_path, file_name, **kwargs):
         self._configure(kwargs, dont_fail=True)

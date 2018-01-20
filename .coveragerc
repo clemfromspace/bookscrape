@@ -1,0 +1,6 @@
+[run]
+omit =
+    tests/*
+    bookscrape/crawl/spiders/*
+    *__init__.py*
+    *settings.py*
