@@ -75,7 +75,10 @@ def parse_args(args):
     return parser.parse_args(args)
 
 
-def main(args):
+def main(args=None):
+    if not args:
+        args = sys.argv[1:]
+
     args = parse_args(args)
     crawl(args.slug, args.volumes, args.output_dir)
 
