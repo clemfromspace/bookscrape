@@ -66,16 +66,25 @@ class KissmangaSpider(CrawlSpider):
         ordered_volumes = []
 
         for index, volume in enumerate(volumes):
-            volume_id = int(volume.xpath('./td[1]/a/@href').extract()[0].split('id=')[-1])
+            volume_id = int(
+                volume.xpath('./td[1]/a/@href').extract()[0].split('id=')[-1]
+            )
             volume_date = parse(volume.xpath('./td[2]/text()').extract()[0])
             ordered_volumes.append((volume_id, volume_date, index,))
 
-        ordered_volumes = sorted(ordered_volumes, key=lambda tup: tup[2], reverse=True)
+        ordered_volumes = sorted(
+            ordered_volumes,
+            key=lambda tup: tup[2],
+            reverse=True
+        )
         ordered_volumes = sorted(ordered_volumes, key=lambda tup: tup[1])
         wanted_volume = ordered_volumes[self.volume-1]
 
         yield Request(
-            urljoin(response.url, '/Manga/%s/v?id=%d' % (self.book_slug, wanted_volume[0])),
+            urljoin(
+                response.url,
+                '/Manga/%s/v?id=%d' % (self.book_slug, wanted_volume[0])
+            ),
             callback=self.parse_images
         )
 
@@ -123,7 +132,11 @@ class KissmangaSpider(CrawlSpider):
         ]
 
         for image_url in image_urls:
-            page_index = image_url.split('/')[-1].replace('.jpg', '').replace('.png', '')
+            page_index = image_url.split('/')[-1].replace(
+                '.jpg',
+                ''
+            ).replace('.png', '')
+
             if '-' in page_index:
                 page_index = page_index.split('-')[-1]
 

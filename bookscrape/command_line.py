@@ -9,24 +9,30 @@ from scrapy.utils.log import configure_logging
 from bookscrape.crawl.spiders.kissmanga import KissmangaSpider
 
 
+SETTINGS = {
+    'BOT_NAME': 'bookscrape',
+    'USER_AGENT': 'Mozilla/5.0 (X11; Linux x86_64; rv:10.0) '
+                  'Gecko/20100101 Firefox/10.0',
+    'ROBOTSTXT_OBEY': False,
+    'CONCURRENT_REQUESTS': 5,
+    'COOKIES_ENABLED': False,
+    'RETRY_TIMES': 4,
+    'ITEM_PIPELINES': {
+        'scrapy.pipelines.images.ImagesPipeline': 1,
+        'bookscrape.crawl.pipelines.BookPipeline': 2
+    },
+    'REDIRECT_ENABLED': True
+}
+
+
 def crawl(book_slug, volumes, output_dir):
 
     configure_logging()
 
     runner = CrawlerRunner(
         settings={
-            'BOT_NAME': 'bookscrape',
-            'USER_AGENT': 'Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20100101 Firefox/10.0',
-            'ROBOTSTXT_OBEY': False,
-            'CONCURRENT_REQUESTS': 5,
-            'COOKIES_ENABLED': False,
-            'RETRY_TIMES': 4,
-            'ITEM_PIPELINES': {
-                'scrapy.pipelines.images.ImagesPipeline': 1,
-                'bookscrape.crawl.pipelines.BookPipeline': 2
-            },
             'IMAGES_STORE': os.path.join(output_dir, 'images'),
-            'REDIRECT_ENABLED': True
+            **SETTINGS
         }
     )
 
