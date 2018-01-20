@@ -1,9 +1,17 @@
+env:
+  global:
+    - CODECLIMATE_REPO_TOKEN=6eebbf153482d1057829ecbfb67f601c202edb1b4431d690e22c491b6e0430b5
+
 language: python
 python:
   - 3.6
+
 install:
-  - pip install -r requirements.txt
+  - pip install -r requirements-test.txt
+
 script:
-  - pytest
+  - pytest --cov=bookscrape tests/
+  - codeclimate-test-reporter
+
 notifications:
   email: false
