@@ -9,10 +9,10 @@ import os
 #     http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
 #     http://scrapy.readthedocs.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = 'pybook'
+BOT_NAME = 'bookscrape'
 
-SPIDER_MODULES = ['pybook.crawl.spiders']
-NEWSPIDER_MODULE = 'pybook.crawl.spiders'
+SPIDER_MODULES = ['bookscrape.crawl.spiders']
+NEWSPIDER_MODULE = 'bookscrape.crawl.spiders'
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
@@ -71,7 +71,7 @@ RETRY_TIMES = 4
 # }
 ITEM_PIPELINES = {
     'scrapy.pipelines.images.ImagesPipeline': 1,
-    'pybook.crawl.pipelines.BookPipeline': 2
+    'bookscrape.crawl.pipelines.BookPipeline': 2
 }
 
 IMAGES_STORE = os.path.join(os.path.dirname(__file__), 'images')

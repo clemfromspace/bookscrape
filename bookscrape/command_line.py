@@ -1,18 +1,34 @@
 import argparse
+import os
+import sys
 
 from twisted.internet import reactor
 from scrapy.crawler import CrawlerRunner
 from scrapy.utils.log import configure_logging
-from scrapy.utils.project import get_project_settings
 
-from crawl.spiders.kissmanga import KissmangaSpider
+from bookscrape.crawl.spiders.kissmanga import KissmangaSpider
 
 
 def crawl(book_slug, volumes, output_dir):
 
     configure_logging()
 
-    runner = CrawlerRunner(settings=get_project_settings())
+    runner = CrawlerRunner(
+        settings={
+            'BOT_NAME': 'bookscrape',
+            'USER_AGENT': 'Mozilla/5.0 (X11; Linux x86_64; rv:10.0) Gecko/20100101 Firefox/10.0',
+            'ROBOTSTXT_OBEY': False,
+            'CONCURRENT_REQUESTS': 5,
+            'COOKIES_ENABLED': False,
+            'RETRY_TIMES': 4,
+            'ITEM_PIPELINES': {
+                'scrapy.pipelines.images.ImagesPipeline': 1,
+                'bookscrape.crawl.pipelines.BookPipeline': 2
+            },
+            'IMAGES_STORE': os.path.join(output_dir, 'images'),
+            'REDIRECT_ENABLED': True
+        }
+    )
 
     for volume in volumes:
         runner.crawl(
@@ -28,7 +44,7 @@ def crawl(book_slug, volumes, output_dir):
     reactor.run()
 
 
-def main():
+def parse_args(args):
     parser = argparse.ArgumentParser(description='Download a book.')
     parser.add_argument(
         'slug',
@@ -44,17 +60,20 @@ def main():
         help='The volume(s) of the book to download'
     )
     parser.add_argument(
-        '--output_dir',
+        'output_dir',
         metavar='output_dir',
         type=str,
         help='The full path of the directory to place the downloaded files'
     )
 
-    args = parser.parse_args()
+    return parser.parse_args(args)
 
+
+def main(args):
+    args = parse_args(args)
     crawl(args.slug, args.volumes, args.output_dir)
 
 
 if __name__ == "__main__":
     # execute only if run as a script
-    main()
+    main(sys.argv[1:])

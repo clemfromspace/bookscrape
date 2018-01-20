@@ -13,4 +13,4 @@ def _extract_version(package_name):
         return _conf['metadata']['version']
 
 
-__version__ = _extract_version('pybook')
+__version__ = _extract_version('bookscrape')

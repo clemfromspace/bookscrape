@@ -1,6 +1,6 @@
 """This module contains the pipelines for the ``pybook`` package"""
 
-from .exporters import PdfExporter
+from bookscrape.crawl.exporters import PdfExporter
 
 
 class BookPipeline:
