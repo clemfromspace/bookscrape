@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/clemfromspace/bookscrape.svg?branch=master)](https://travis-ci.org/clemfromspace/bookscrape) [![Test Coverage](https://api.codeclimate.com/v1/badges/c716cb35ce542efa1bff/test_coverage)](https://codeclimate.com/github/clemfromspace/bookscrape/test_coverage) [![Maintainability](https://api.codeclimate.com/v1/badges/c716cb35ce542efa1bff/maintainability)](https://codeclimate.com/github/clemfromspace/bookscrape/maintainability)
+[![PyPI](https://img.shields.io/pypi/v/bookscrape.svg)](https://pypi.python.org/pypi/bookscrape) [![Build Status](https://travis-ci.org/clemfromspace/bookscrape.svg?branch=master)](https://travis-ci.org/clemfromspace/bookscrape) [![Test Coverage](https://api.codeclimate.com/v1/badges/c716cb35ce542efa1bff/test_coverage)](https://codeclimate.com/github/clemfromspace/bookscrape/test_coverage) [![Maintainability](https://api.codeclimate.com/v1/badges/c716cb35ce542efa1bff/maintainability)](https://codeclimate.com/github/clemfromspace/bookscrape/maintainability)
 
 ## Bookscrape
 Scrape and build e-books from various websites
