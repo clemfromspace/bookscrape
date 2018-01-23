@@ -1,17 +1,22 @@
 env:
   global:
-    - CODECLIMATE_REPO_TOKEN=6eebbf153482d1057829ecbfb67f601c202edb1b4431d690e22c491b6e0430b5
-
+  - CODECLIMATE_REPO_TOKEN=6eebbf153482d1057829ecbfb67f601c202edb1b4431d690e22c491b6e0430b5
 language: python
 python:
-  - 3.6
-
+- 3.6
 install:
-  - pip install -r requirements-test.txt
-
+- pip install -r requirements-test.txt
 script:
-  - pytest --cov-config .coveragerc --cov=bookscrape tests/
-  - codeclimate-test-reporter
-
+- pytest --cov-config .coveragerc --cov=bookscrape tests/
+- codeclimate-test-reporter
+deploy:
+  provider: pypi
+  user: clemfromspace
+  password:
+    secure: JlQYSDBhZkhmB6wWsU7vdQdHRGCyd5SpWwWxxh3TOK9GoljyK5D9PRYZHJO6a2t/yKfxJHAcn3mfWGCv64t1qF53RUDTqqnK3UETVzeVng8tHl526UecGlnxKECnLkB5bFA39SKBMtc5bbcGsF5RNxm8QHIf/J1QtpEClkpCh0y/R5oW3d8Wcuilx5aZM2pRSHnk62xZ+rffKZKBVS08tkHNLOGe0tJvkGyRKyUhQHiMKLnJpcZrhDd2ue4tQPhpefBMBSr1cP8/rvcvfSlmYRGEwD3dxsl41962g9orUzRS/ktQvtXofAvtyIIaAVmh52+eamJkoJlOn3hG+GGP96MyRaLeHOXbTWjD3MY/Q+Y7XU5WmcmtdjulVObqYJobrR4HDEowiXRjlddvccLBTt60yqLlvQPNcMFEeYaFLjWgznCJyKgAe8RpALBs61/NwSH/hJyp9vJFU+aiFVFaJql4RF30fgT9YqoKWXYyuZmpJRYrFunhuZ+TW1NyHK9gCnipVlgPfKJA7qYT4jOBzaBlUcwujsmKKubroVunQ+e0GWhr09zKuXB0tG1znFMrB66h6+wuaLM79KvzAqCx32o/86IeDWLj6dsIzI41YdQKO+IiAnT9Y0uFbXkAs+nC83u8O9x8WRniiaBKXz2m2NmcCqFg5qmzPNnzrUFTEwU=
+  on:
+    tags: true
+    distributions: sdist bdist_wheel
+    repo: clemfromspace/bookscrape
 notifications:
   email: false
