@@ -89,11 +89,12 @@ class KissmangaSpider(CrawlSpider):
         )
 
     @staticmethod
-    def _decode_images_path(obfuscated_path):
+    def _decode_images_path(key, obfuscated_path):
         """De-obfuscated an image path from the "kissmanga" website
 
         Parameters
         ----------
+        key: binary
         obfuscated_path: str
 
         Returns
@@ -110,7 +111,7 @@ class KissmangaSpider(CrawlSpider):
         iv = codecs.decode(b'a5e8e2e9c2721be0a84ad660c472c1f3', 'hex')
 
         sha = SHA256.new()
-        sha.update(b'mshsdf832nsdbash20asdm')
+        sha.update(key)
         key = sha.digest()
 
         encoded = b64decode(obfuscated_path)
@@ -123,11 +124,15 @@ class KissmangaSpider(CrawlSpider):
     def parse_images(self, response):
         """Parse the images list of the wanted book volume"""
 
+        key_regex = re.compile(r'\["(.+)"\]; chko')
+        key = re.findall(key_regex, response.body.decode('utf-8'))[1]
+        key = bytes(key, 'utf8').decode('unicode_escape').encode('utf-8')
+
         p = re.compile(r'\.push\(wrapKA\("(.+)"\)')
         obfuscated_image_urls = re.findall(p, response.body.decode('utf-8'))
 
         image_urls = [
-            self._decode_images_path(image_path)
+            self._decode_images_path(key, image_path)
             for image_path in obfuscated_image_urls
         ]
 
