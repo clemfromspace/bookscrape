@@ -3,6 +3,7 @@
 import codecs
 import re
 import cfscrape
+import requests
 from dateutil.parser import parse
 from urllib.parse import urljoin
 from Crypto.Hash import SHA256
@@ -11,6 +12,8 @@ from base64 import b64decode
 
 from scrapy import Request
 from scrapy.spiders import CrawlSpider
+
+from bookscrape.exceptions import BookScrapeException
 
 from ..items import BookPageItem
 
@@ -45,46 +48,65 @@ class KissmangaSpider(CrawlSpider):
         self.volume = int(volume)
         self.output_dir = output_dir
 
+        self.cloudflare_token = None
+
     def start_requests(self):
         """Solve the "Cloudflare" challenge and start the crawling"""
 
-        tokens, user_agent = cfscrape.get_tokens(
-            'http://kissmanga.com/',
-            user_agent=self.settings.get('USER_AGENT')
-        )
+        try:
+            self.cloudflare_token, user_agent = cfscrape.get_tokens(
+                'http://kissmanga.com/',
+                user_agent=self.settings.get('USER_AGENT')
+            )
+        except Exception:
+            raise BookScrapeException(
+                'Unable to bypass "cloudflare" antibot protection'
+            )
 
         yield Request(
             url='http://kissmanga.com/Manga/%s' % self.book_slug,
-            cookies=tokens
+            cookies=dict(
+                vns_readType1='1',
+                **self.cloudflare_token
+            ),
+            callback=self.parse_volumes_list
         )
 
-    def parse(self, response):
+    def parse_volumes_list(self, response):
         """Parse the volume list and try to find the asked volume"""
 
         volumes = response.xpath('//table[@class="listing"]//tr[position()>2]')
+
+        if not len(volumes):
+            raise BookScrapeException(
+                'No volumes found for the "%s" slug' % self.book_slug
+            )
 
         ordered_volumes = []
 
         for index, volume in enumerate(volumes):
             volume_id = int(
-                volume.xpath('./td[1]/a/@href').extract()[0].split('id=')[-1]
+                volume.xpath(
+                    './td[1]/a/@href'
+                ).extract_first().split('id=')[-1]
             )
-            volume_date = parse(volume.xpath('./td[2]/text()').extract()[0])
+            volume_date = parse(volume.xpath('./td[2]/text()').extract_first())
             ordered_volumes.append((volume_id, volume_date, index,))
 
-        ordered_volumes = sorted(
-            ordered_volumes,
-            key=lambda tup: tup[2],
-            reverse=True
-        )
-        ordered_volumes = sorted(ordered_volumes, key=lambda tup: tup[1])
-        wanted_volume = ordered_volumes[self.volume-1]
+        ordered_volumes.reverse()
 
-        yield Request(
-            urljoin(
-                response.url,
-                '/Manga/%s/v?id=%d' % (self.book_slug, wanted_volume[0])
-            ),
+        try:
+            wanted_volume = ordered_volumes[self.volume-1]
+        except IndexError:
+            raise BookScrapeException(
+                'The %d volume was not found for the "%s" slug' % (
+                    self.volume,
+                    self.book_slug
+                )
+            )
+
+        yield response.follow(
+            '/Manga/%s/v?id=%d' % (self.book_slug, wanted_volume[0]),
             callback=self.parse_images
         )
 
@@ -102,10 +124,6 @@ class KissmangaSpider(CrawlSpider):
         str
             The de-obfuscated image path
 
-        See Also
-        --------
-        https://gist.github.com/nhanb/74542c36d3dcc5dde4e90b34437fb523
-
         """
 
         iv = codecs.decode(b'a5e8e2e9c2721be0a84ad660c472c1f3', 'hex')
@@ -121,26 +139,60 @@ class KissmangaSpider(CrawlSpider):
 
         return result.decode('utf-8').replace('\x10', '')
 
+    def _get_decode_key(self, response):
+        """Get the key to decode the obfuscated images"""
+
+        try:
+            # Try to find the key to decrypt the obfuscated images in the page
+            key_regex = re.compile(r'\["(.+)"\]; chko')
+            key = re.findall(key_regex, response.body.decode('utf-8'))[-1]
+        except IndexError:
+            # No success, need to parse the key from the javascript file
+            javascript_response = requests.get(
+                urljoin(response.url, '/Scripts/lo.js'),
+                cookies=self.cloudflare_token,
+                headers={
+                    'user-agent': self.settings.get('USER_AGENT')
+                }
+            )
+            key_regex = re.compile(r'\["(.+)\"]')
+            key = re.findall(key_regex, javascript_response.text)[0].replace(
+                '"',
+                ''
+            ).split(',')[21]
+
+        decoded_key = bytes(
+            key,
+            'utf8'
+        ).decode('unicode_escape').encode('utf-8')
+
+        return decoded_key
+
     def parse_images(self, response):
         """Parse the images list of the wanted book volume"""
 
-        key_regex = re.compile(r'\["(.+)"\]; chko')
-        key = re.findall(key_regex, response.body.decode('utf-8'))[1]
-        key = bytes(key, 'utf8').decode('unicode_escape').encode('utf-8')
-
+        key = self._get_decode_key(response)
         p = re.compile(r'\.push\(wrapKA\("(.+)"\)')
         obfuscated_image_urls = re.findall(p, response.body.decode('utf-8'))
 
-        image_urls = [
-            self._decode_images_path(key, image_path)
-            for image_path in obfuscated_image_urls
-        ]
+        try:
+            image_urls = [
+                self._decode_images_path(key, image_path)
+                for image_path in obfuscated_image_urls
+            ]
+        except Exception:
+            raise BookScrapeException(
+                'Unable to decrypt the obfuscated image paths :('
+            )
 
         for image_url in image_urls:
             page_index = image_url.split('/')[-1].replace(
                 '.jpg',
                 ''
-            ).replace('.png', '')
+            ).replace('.png', '').replace(
+                '&imgmax=25000',
+                ''
+            ).replace('\x08', '').replace('\x05', '').strip()
 
             if '-' in page_index:
                 page_index = page_index.split('-')[-1]

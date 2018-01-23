@@ -3,7 +3,8 @@
 import unittest
 from unittest import mock
 
-from bookscrape.command_line import main
+from bookscrape.command_line import crawl, main
+from bookscrape.crawl.spiders.kissmanga import KissmangaSpider
 
 
 class TestCommandLine(unittest.TestCase):
@@ -26,9 +27,42 @@ class TestCommandLine(unittest.TestCase):
 
         # With only one volume
         main(['Akira', '1', 'not/a/path'])
-        crawl.assert_called_with('Akira', [1], 'not/a/path')
+        crawl.assert_called_with('Akira', [1], 'not/a/path', False)
 
         # With two volumes
         main(['Akira', '1', '2', 'not/a/path'])
-        crawl.assert_called_with('Akira', [1, 2], 'not/a/path')
+        crawl.assert_called_with('Akira', [1, 2], 'not/a/path', False)
 
+    @mock.patch('twisted.internet.reactor.run')
+    @mock.patch('scrapy.crawler.CrawlerRunner.crawl')
+    def test_crawl_should_call_the_crawl_method_on_the_crawler_runner(self, mocked_crawl, mocked_run):
+        """Test that the ``crawl`` method should call the ``CrawlerRunner.crawl``"""
+
+        crawl('Akira', [1], 'not-a-path')
+
+        # The crawl method should be called
+        mocked_crawl.assert_called_once_with(
+            KissmangaSpider,
+            book_slug='Akira',
+            volume=1,
+            output_dir='not-a-path'
+        )
+
+        # The twisted reactor should be launched
+        mocked_run.assert_called_once_with()
+
+        # If we want to get two volumes, the crawl method should be called twice
+        volumes = [1, 2]
+        crawl('Akira', volumes, 'not-a-path')
+
+        calls = [
+            mock.call(
+                KissmangaSpider,
+                book_slug='Akira',
+                volume=volume,
+                output_dir='not-a-path'
+            )
+            for volume in volumes
+        ]
+
+        mocked_crawl.assert_has_calls(calls)
