@@ -1,12 +1,16 @@
 import argparse
 import os
 import sys
+from typing import Iterable
 
-from twisted.internet import reactor
+from scrapy import signals
 from scrapy.crawler import CrawlerRunner
 from scrapy.utils.log import configure_logging
+from twisted.internet import reactor
 
 from bookscrape.crawl.spiders.kissmanga import KissmangaSpider
+from bookscrape.exceptions import BookScrapeException
+from bookscrape.loggers import logger
 
 
 SETTINGS = {
@@ -25,9 +29,17 @@ SETTINGS = {
 }
 
 
-def crawl(book_slug, volumes, output_dir):
+def crawl(book_slug: str,
+          volumes: Iterable[int],
+          output_dir: str,
+          verbose=False):
+    """Crawl the given provided book_slug, exporting the volumes
+    to the provided directory
 
-    configure_logging()
+    """
+
+    if verbose:
+        configure_logging()
 
     runner = CrawlerRunner(
         settings={
@@ -44,13 +56,32 @@ def crawl(book_slug, volumes, output_dir):
             output_dir=output_dir
         )
 
+    def error(failure, response, spider):
+        if isinstance(failure.value, BookScrapeException):
+            logger.error(str(failure.value))
+        else:
+            logger.error(failure)
+
     d = runner.join()
     d.addBoth(lambda _: reactor.stop())
+
+    for crawler in list(runner.crawlers):
+        crawler.signals.connect(error, signals.spider_error)
+
+    logger.info('Crawling started for the book slug "%s"', book_slug)
 
     reactor.run()
 
 
-def parse_args(args):
+def _parse_args(args):
+    """Parse the given args
+
+    Parameters
+    ----------
+    args: list
+
+    """
+
     parser = argparse.ArgumentParser(description='Download a book.')
     parser.add_argument(
         'slug',
@@ -71,6 +102,10 @@ def parse_args(args):
         type=str,
         help='The full path of the directory to place the downloaded files'
     )
+    parser.add_argument(
+        '--verbose',
+        action='store_true'
+    )
 
     return parser.parse_args(args)
 
@@ -79,8 +114,8 @@ def main(args=None):
     if not args:
         args = sys.argv[1:]
 
-    args = parse_args(args)
-    crawl(args.slug, args.volumes, args.output_dir)
+    args = _parse_args(args)
+    crawl(args.slug, args.volumes, args.output_dir, args.verbose)
 
 
 if __name__ == "__main__":
