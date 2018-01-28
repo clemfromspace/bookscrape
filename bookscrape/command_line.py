@@ -4,11 +4,13 @@ import sys
 from typing import Iterable
 
 from scrapy import signals
+from scrapy import spiderloader
 from scrapy.crawler import CrawlerRunner
+from scrapy.spiders import CrawlSpider
+from scrapy.utils import project
 from scrapy.utils.log import configure_logging
 from twisted.internet import reactor
 
-from bookscrape.crawl.spiders.kissmanga import KissmangaSpider
 from bookscrape.exceptions import BookScrapeException
 from bookscrape.loggers import logger
 
@@ -29,12 +31,26 @@ SETTINGS = {
 }
 
 
-def crawl(book_slug: str,
+def _available_spiders() -> dict:
+    """Get the spiders list of the current project"""
+
+    settings = project.get_project_settings()
+    spider_loader = spiderloader.SpiderLoader.from_settings(settings)
+    spiders = spider_loader.list()
+
+    return {
+        name: spider_loader.load(name)
+        for name in spiders
+    }
+
+
+def crawl(provider: CrawlSpider,
+          slug: str,
           volumes: Iterable[int],
           output_dir: str,
           verbose=False):
-    """Crawl the given provided book_slug, exporting the volumes
-    to the provided directory
+    """Crawl the given provided book identified by its slug on the spider,
+    exporting the volumes to the given directory
 
     """
 
@@ -50,8 +66,8 @@ def crawl(book_slug: str,
 
     for volume in volumes:
         runner.crawl(
-            KissmangaSpider,
-            book_slug=book_slug,
+            provider,
+            book_slug=slug,
             volume=volume,
             output_dir=output_dir
         )
@@ -68,7 +84,11 @@ def crawl(book_slug: str,
     for crawler in list(runner.crawlers):
         crawler.signals.connect(error, signals.spider_error)
 
-    logger.info('Crawling started for the book slug "%s"', book_slug)
+    logger.info(
+        'Crawling started for the book slug "%s" on the "%s" provider',
+        slug,
+        provider.name
+    )
 
     reactor.run()
 
@@ -82,23 +102,29 @@ def _parse_args(args):
 
     """
 
-    parser = argparse.ArgumentParser(description='Download a book.')
+    parser = argparse.ArgumentParser(
+        description='Download the book volume(s) identified by '
+                    'the slug from the given provider'
+    )
+    parser.add_argument(
+        'provider',
+        type=str,
+        choices=_available_spiders().keys(),
+        help='The provider to use'
+    )
     parser.add_argument(
         'slug',
-        metavar='slug',
         type=str,
         help='The slug of the book to download'
     )
     parser.add_argument(
         'volumes',
-        metavar='volumes',
         type=int,
         nargs='+',
         help='The volume(s) of the book to download'
     )
     parser.add_argument(
         'output_dir',
-        metavar='output_dir',
         type=str,
         help='The full path of the directory to place the downloaded files'
     )
@@ -115,7 +141,13 @@ def main(args=None):
         args = sys.argv[1:]
 
     args = _parse_args(args)
-    crawl(args.slug, args.volumes, args.output_dir, args.verbose)
+    crawl(
+        _available_spiders()[args.provider],
+        args.slug,
+        args.volumes,
+        args.output_dir,
+        args.verbose
+    )
 
 
 if __name__ == "__main__":

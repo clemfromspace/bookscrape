@@ -5,10 +5,29 @@ Scrape and build e-books from various websites
 
 ### Usage
 ```
-bookscrape Akira 1 2 --output_dir=/Users/bookscrape/Documents/
+bookscrape kissmanga Akira 1 2 --output_dir=/Users/bookscrape/Documents/
 ```
 
-The above command will download the volumes **1** and **2** from the **Akira** manga and save the pdfs files containing the extracted images to **/Users/bookscrape/Documents/**
+The above command will download the volumes `1` and `2` from the `Akira` manga on the `kissmanga` website and save the pdfs files containing the extracted images to `/Users/bookscrape/Documents/`
+
+```
+bookscrape --help
+
+usage: bookscrape [-h] [--verbose] {kissmanga,readcomiconline} slug volumes [volumes ...] output_dir
+
+Download a book volume identified by its slug from the given provider
+
+positional arguments:
+  {kissmanga,readcomiconline} The provider to use
+  slug                        The slug of the book to download
+  volumes                     The volume(s) of the book to download
+  output_dir                  The full path of the directory to place the downloaded files
+```
+
+### Supported providers
+- kissmanga (http://kissmanga.com/)
+- readcomiconline (http://readcomiconline.to)
+
 
 ### Install
 ```

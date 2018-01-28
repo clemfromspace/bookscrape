@@ -4,8 +4,6 @@ import os
 import unittest
 from unittest import mock
 
-from reportlab.platypus import Image
-
 from bookscrape.crawl.exporters import PdfExporter
 from bookscrape.exceptions import BookScrapeException
 
