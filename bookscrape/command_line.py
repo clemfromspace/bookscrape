@@ -5,9 +5,9 @@ from typing import Iterable
 
 from scrapy import signals
 from scrapy import spiderloader
+from scrapy.settings import Settings
 from scrapy.crawler import CrawlerRunner
 from scrapy.spiders import CrawlSpider
-from scrapy.utils import project
 from scrapy.utils.log import configure_logging
 from twisted.internet import reactor
 
@@ -34,7 +34,9 @@ SETTINGS = {
 def _available_spiders() -> dict:
     """Get the spiders list of the current project"""
 
-    settings = project.get_project_settings()
+    settings = Settings()
+    settings.setmodule('bookscrape.crawl.settings')
+
     spider_loader = spiderloader.SpiderLoader.from_settings(settings)
     spiders = spider_loader.list()
 
