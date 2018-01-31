@@ -40,7 +40,7 @@ class PdfExporter(BaseItemExporter):
             except FileNotFoundError:
                 pass
 
-    def _get_document(self):
+    def _get_document(self) -> SimpleDocTemplate:
         return SimpleDocTemplate(
             os.path.join(
                 self.output_dir,
@@ -54,6 +54,8 @@ class PdfExporter(BaseItemExporter):
         )
 
     def finish_exporting(self):
+        """Build the document and clean the downloaded images"""
+
         if not self.images:  # No images were found :(
             raise BookScrapeException('Found no images to export :(')
 
@@ -74,7 +76,8 @@ class PdfExporter(BaseItemExporter):
         self._clean_images()
 
         logger.info(
-            'Finishing exporting %d images, file available: %s' % (
+            'Pdf document for the book slug "%s" (%d pages) available: %s' % (
+                self.file_name.split('_')[0],
                 len(self.images),
                 document.filename
             )

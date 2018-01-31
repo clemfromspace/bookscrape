@@ -44,7 +44,7 @@ class TestCommandLine(unittest.TestCase):
         crawl.assert_called_with(KissmangaSpider, 'Akira', [1], 'not/a/path', False)
 
         # With two volumes
-        main(['kissmanga', 'Akira', '1', '2', 'not/a/path'])
+        main(['kissmanga', 'Akira', '1-2', 'not/a/path'])
         crawl.assert_called_with(KissmangaSpider, 'Akira', [1, 2], 'not/a/path', False)
 
     @mock.patch('twisted.internet.reactor.run')

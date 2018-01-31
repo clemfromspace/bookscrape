@@ -9,7 +9,7 @@ from scrapy.settings import Settings
 from scrapy.crawler import CrawlerRunner
 from scrapy.spiders import CrawlSpider
 from scrapy.utils.log import configure_logging
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 
 from bookscrape.exceptions import BookScrapeException
 from bookscrape.loggers import logger
@@ -66,22 +66,23 @@ def crawl(provider: CrawlSpider,
         }
     )
 
-    for volume in volumes:
-        runner.crawl(
-            provider,
-            book_slug=slug,
-            volume=volume,
-            output_dir=output_dir
-        )
+    @defer.inlineCallbacks
+    def run_crawlers():
+        for volume in volumes:
+            yield runner.crawl(
+                provider,
+                book_slug=slug,
+                volume=volume,
+                output_dir=output_dir
+            )
+
+        reactor.stop()
 
     def error(failure, response, spider):
         if isinstance(failure.value, BookScrapeException):
             logger.error(str(failure.value))
         else:
             logger.error(failure)
-
-    d = runner.join()
-    d.addBoth(lambda _: reactor.stop())
 
     for crawler in list(runner.crawlers):
         crawler.signals.connect(error, signals.spider_error)
@@ -92,17 +93,21 @@ def crawl(provider: CrawlSpider,
         provider.name
     )
 
+    run_crawlers()
     reactor.run()
 
 
-def _parse_args(args):
-    """Parse the given args
+def _parse_args(args: list) -> argparse.ArgumentParser:
+    """Parse the given args"""
 
-    Parameters
-    ----------
-    args: list
+    def parse_range_type(string: str) -> Iterable[int]:
+        """Parse a range given as a string, ie: 10-20"""
 
-    """
+        ranges = string.split('-')
+        start = int(ranges[0])
+        end = int(ranges[1]) if len(ranges) > 1 else start
+
+        return list(range(start, end + 1))
 
     parser = argparse.ArgumentParser(
         description='Download the book volume(s) identified by '
@@ -121,8 +126,8 @@ def _parse_args(args):
     )
     parser.add_argument(
         'volumes',
-        type=int,
-        nargs='+',
+        metavar='[volume_start-volume_end]',
+        type=parse_range_type,
         help='The volume(s) of the book to download'
     )
     parser.add_argument(
