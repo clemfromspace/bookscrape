@@ -36,15 +36,15 @@ class PdfExporter(BaseItemExporter):
         # Remove the downloaded images
         for image in self.images:
             try:
-                os.remove(image[1])
+                os.remove(image[2])
             except FileNotFoundError:
                 pass
 
-    def _get_document(self):
+    def _get_document(self) -> SimpleDocTemplate:
         return SimpleDocTemplate(
             os.path.join(
                 self.output_dir,
-                self.file_name + '.pdf'
+                self.file_name
             ),
             pagesize=letter,
             rightMargin=72,
@@ -54,16 +54,18 @@ class PdfExporter(BaseItemExporter):
         )
 
     def finish_exporting(self):
+        """Build the document and clean the downloaded images"""
+
         if not self.images:  # No images were found :(
             raise BookScrapeException('Found no images to export :(')
 
         document = self._get_document()
         story = list()
 
-        for image in sorted(self.images, key=itemgetter(0)):
+        for image in sorted(self.images, key=itemgetter(0, 1)):
             story.append(
                 Image(
-                    image[1],
+                    image[2],
                     self.IMAGE_WIDTH,
                     self.IMAGE_HEIGHT
                 )
@@ -74,7 +76,8 @@ class PdfExporter(BaseItemExporter):
         self._clean_images()
 
         logger.info(
-            'Finishing exporting %d images, file available: %s' % (
+            'Pdf document for the book slug "%s" (%d pages) available: %s' % (
+                self.file_name.split('_')[0],
                 len(self.images),
                 document.filename
             )
@@ -86,5 +89,5 @@ class PdfExporter(BaseItemExporter):
             item['images'][0]['path']
         )
         self.images.append(
-            (item['page_index'], image_path,)
+            (item['volume_index'], item['page_index'], image_path,)
         )

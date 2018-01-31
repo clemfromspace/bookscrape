@@ -47,19 +47,9 @@ class TestPdfExporter(unittest.TestCase):
                         'path': 'test.png'
                     }
                 ],
-                'page_index': 0
+                'page_index': 0,
+                'volume_index': 1
             }
-        )
-
-        # We need to add at least one image
-        pdf_exporter.images.append(
-            (
-                0,
-                os.path.join(
-                    self.document_path,
-                    'test.png'
-                ),
-            )
         )
 
         with mock.patch('reportlab.platypus.SimpleDocTemplate.build') as mocked:
@@ -82,6 +72,7 @@ class TestPdfExporter(unittest.TestCase):
 
         pdf_exporter.export_item(
             {
+                'volume_index': 1,
                 'page_index': 0,
                 'images': [
                     {

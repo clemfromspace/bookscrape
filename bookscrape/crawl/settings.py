@@ -43,8 +43,7 @@ RETRY_TIMES = 4
 # 'scrapers.pipelines.QuotePipeline': 300,
 # }
 ITEM_PIPELINES = {
-    'scrapy.pipelines.images.ImagesPipeline': 1,
-    'bookscrape.crawl.pipelines.BookPipeline': 2
+    'scrapy.pipelines.images.ImagesPipeline': 1
 }
 
 IMAGES_STORE = os.path.join(os.path.dirname(__file__), 'images')

@@ -1,16 +1,15 @@
-import argparse
 import os
-import sys
-from typing import Iterable
 
+import click
 from scrapy import signals
 from scrapy import spiderloader
 from scrapy.settings import Settings
-from scrapy.crawler import CrawlerRunner
+from scrapy.crawler import Crawler, CrawlerRunner
 from scrapy.spiders import CrawlSpider
 from scrapy.utils.log import configure_logging
-from twisted.internet import reactor
+from twisted.internet import reactor, defer
 
+from bookscrape.crawl.exporters import PdfExporter
 from bookscrape.exceptions import BookScrapeException
 from bookscrape.loggers import logger
 
@@ -24,8 +23,7 @@ SETTINGS = {
     'COOKIES_ENABLED': False,
     'RETRY_TIMES': 4,
     'ITEM_PIPELINES': {
-        'scrapy.pipelines.images.ImagesPipeline': 1,
-        'bookscrape.crawl.pipelines.BookPipeline': 2
+        'scrapy.pipelines.images.ImagesPipeline': 1
     },
     'REDIRECT_ENABLED': True
 }
@@ -46,112 +44,112 @@ def _available_spiders() -> dict:
     }
 
 
-def crawl(provider: CrawlSpider,
-          slug: str,
-          volumes: Iterable[int],
-          output_dir: str,
-          verbose=False):
-    """Crawl the given provided book identified by its slug on the spider,
-    exporting the volumes to the given directory
+class BookCrawler:
+    """Crawl the provided book, exporting the crawled images"""
 
-    """
+    def __init__(self,
+                 provider: CrawlSpider,
+                 slug: str,
+                 volumes: range,
+                 output_dir: str,
+                 verbose=False):
 
-    if verbose:
-        configure_logging()
+        self.provider = provider
+        self.slug = slug
+        self.volumes = list(volumes)
+        self.output_dir = output_dir
+        self.verbose = verbose
 
-    runner = CrawlerRunner(
-        settings={
-            'IMAGES_STORE': os.path.join(output_dir, 'images'),
-            **SETTINGS
-        }
-    )
+        if verbose:
+            configure_logging()
 
-    for volume in volumes:
-        runner.crawl(
-            provider,
-            book_slug=slug,
-            volume=volume,
-            output_dir=output_dir
+        self.runner = CrawlerRunner()
+        self.exporter = PdfExporter(
+            output_dir,
+            os.path.join(output_dir, 'images'),
+            file_name='%s_%s.pdf' % (
+                slug,
+                '-'.join([str(volumes.start), str(volumes.stop - 1)])
+            )
         )
 
-    def error(failure, response, spider):
+    def run(self):
+        logger.info(
+            'Crawling started for the book slug "%s" on the "%s" provider.',
+            self.slug,
+            self.provider.name
+        )
+        self.crawl()
+        reactor.run()
+
+    @staticmethod
+    def _on_error(failure):
         if isinstance(failure.value, BookScrapeException):
             logger.error(str(failure.value))
         else:
             logger.error(failure)
 
-    d = runner.join()
-    d.addBoth(lambda _: reactor.stop())
+    def _get_crawler(self):
+        crawler = Crawler(self.provider, settings={
+            'IMAGES_STORE': os.path.join(self.output_dir, 'images'),
+            **SETTINGS
+        })
+        crawler.signals.connect(
+            self._on_error,
+            signals.spider_error
+        )
+        crawler.signals.connect(
+            self.exporter.export_item,
+            signals.item_scraped
+        )
 
-    for crawler in list(runner.crawlers):
-        crawler.signals.connect(error, signals.spider_error)
+        return crawler
 
-    logger.info(
-        'Crawling started for the book slug "%s" on the "%s" provider',
-        slug,
-        provider.name
-    )
+    @defer.inlineCallbacks
+    def crawl(self):
+        with click.progressbar(self.volumes) as bar:
+            for volume in bar:
+                yield self.runner.crawl(
+                    self._get_crawler(),
+                    book_slug=self.slug,
+                    volume=volume,
+                    output_dir=self.output_dir
+                )
 
-    reactor.run()
-
-
-def _parse_args(args):
-    """Parse the given args
-
-    Parameters
-    ----------
-    args: list
-
-    """
-
-    parser = argparse.ArgumentParser(
-        description='Download the book volume(s) identified by '
-                    'the slug from the given provider'
-    )
-    parser.add_argument(
-        'provider',
-        type=str,
-        choices=_available_spiders().keys(),
-        help='The provider to use'
-    )
-    parser.add_argument(
-        'slug',
-        type=str,
-        help='The slug of the book to download'
-    )
-    parser.add_argument(
-        'volumes',
-        type=int,
-        nargs='+',
-        help='The volume(s) of the book to download'
-    )
-    parser.add_argument(
-        'output_dir',
-        type=str,
-        help='The full path of the directory to place the downloaded files'
-    )
-    parser.add_argument(
-        '--verbose',
-        action='store_true'
-    )
-
-    return parser.parse_args(args)
+        reactor.stop()
+        self.exporter.finish_exporting()
 
 
-def main(args=None):
-    if not args:
-        args = sys.argv[1:]
+class RangeParamType(click.ParamType):
+    name = 'range'
 
-    args = _parse_args(args)
-    crawl(
-        _available_spiders()[args.provider],
-        args.slug,
-        args.volumes,
-        args.output_dir,
-        args.verbose
-    )
+    def convert(self, value, param, ctx):
+        try:
+            ranges = value.split('-')
+            start = int(ranges[0])
+            end = int(ranges[1]) if len(ranges) > 1 else start
+            return range(start, end + 1)
+        except ValueError:
+            self.fail('%s is not a valid range' % value, param, ctx)
+
+RANGE = RangeParamType()
+
+
+@click.command()
+@click.argument('provider', type=click.Choice(_available_spiders().keys()))
+@click.argument('book_slug')
+@click.argument('volumes', type=RANGE)
+@click.argument('output_dir', type=click.Path(exists=True))
+@click.option('--verbose', is_flag=True)
+def main(provider, book_slug, volumes, output_dir, verbose):
+    BookCrawler(
+        _available_spiders()[provider],
+        book_slug,
+        volumes,
+        output_dir,
+        verbose
+    ).run()
 
 
 if __name__ == "__main__":
-    # execute only if run as a script
-    main(sys.argv[1:])
+    main()
