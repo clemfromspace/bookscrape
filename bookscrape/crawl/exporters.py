@@ -36,7 +36,7 @@ class PdfExporter(BaseItemExporter):
         # Remove the downloaded images
         for image in self.images:
             try:
-                os.remove(image[1])
+                os.remove(image[2])
             except FileNotFoundError:
                 pass
 
@@ -44,7 +44,7 @@ class PdfExporter(BaseItemExporter):
         return SimpleDocTemplate(
             os.path.join(
                 self.output_dir,
-                self.file_name + '.pdf'
+                self.file_name
             ),
             pagesize=letter,
             rightMargin=72,
@@ -62,10 +62,10 @@ class PdfExporter(BaseItemExporter):
         document = self._get_document()
         story = list()
 
-        for image in sorted(self.images, key=itemgetter(0)):
+        for image in sorted(self.images, key=itemgetter(0, 1)):
             story.append(
                 Image(
-                    image[1],
+                    image[2],
                     self.IMAGE_WIDTH,
                     self.IMAGE_HEIGHT
                 )
@@ -89,5 +89,5 @@ class PdfExporter(BaseItemExporter):
             item['images'][0]['path']
         )
         self.images.append(
-            (item['page_index'], image_path,)
+            (item['volume_index'], item['page_index'], image_path,)
         )
