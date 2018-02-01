@@ -62,24 +62,18 @@ class KissmangaReadcomicsBase(CloudFlareSpider, BookSpider):
 
         ordered_volumes = self._get_volumes_list(response)
 
-        try:
-            wanted_volume = ordered_volumes[self.volume-1]
-        except IndexError:
-            raise BookScrapeException(
-                'The %d volume was not found for the "%s" slug' % (
-                    self.volume,
-                    self.book_slug
-                )
+        for volume in self.volumes:
+            yield response.follow(
+                '/%s/%s/v?id=%d' % (
+                    self.url_key,
+                    self.book_slug,
+                    ordered_volumes[volume - 1][0]
+                ),
+                callback=self.export_images,
+                meta={
+                    'current_volume': volume
+                }
             )
-
-        yield response.follow(
-            '/%s/%s/v?id=%d' % (
-                self.url_key,
-                self.book_slug,
-                wanted_volume[0]
-            ),
-            callback=self.export_images
-        )
 
     def _get_page_index(self, image_url: str) -> int:
         """Get the index of the page from a given image_url"""
@@ -101,16 +95,18 @@ class KissmangaReadcomicsBase(CloudFlareSpider, BookSpider):
         if '-' in page_index:
             page_index = page_index.split('-')[-1]
 
-        return page_index
+        return int(page_index)
 
     def export_images(self, response):
         """Export the extracted images"""
+
+        current_volume = response.meta['current_volume']
 
         for image_url in self.extract_images_urls(response):
             page_index = self._get_page_index(image_url)
 
             yield BookPageItem(
                 page_index=page_index,
-                volume_index=self.volume,
+                volume_index=current_volume,
                 image_urls=[image_url]
             )

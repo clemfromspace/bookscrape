@@ -20,20 +20,8 @@ class KissmangaSpider(KissmangaReadcomicsBase):
     url_key = 'Manga'
 
     @staticmethod
-    def _decode_images_path(key, obfuscated_path):
-        """De-obfuscated an image path from the "kissmanga" website
-
-        Parameters
-        ----------
-        key: binary
-        obfuscated_path: str
-
-        Returns
-        -------
-        str
-            The de-obfuscated image path
-
-        """
+    def _decode_images_path(key: bin, obfuscated_path: str) -> str:
+        """De-obfuscated an image path from the "kissmanga" website"""
 
         iv = codecs.decode(b'a5e8e2e9c2721be0a84ad660c472c1f3', 'hex')
 
@@ -48,7 +36,7 @@ class KissmangaSpider(KissmangaReadcomicsBase):
 
         return result.decode('utf-8').replace('\x10', '')
 
-    def _get_decode_key(self, response):
+    def _get_decode_key(self, response) -> bytes:
         """Get the key to decode the obfuscated images"""
 
         try:
@@ -88,7 +76,7 @@ class KissmangaSpider(KissmangaReadcomicsBase):
             image_urls = [
                 self._decode_images_path(key, image_path)
                 for image_path in obfuscated_image_urls
-                ]
+            ]
         except Exception:
             raise BookScrapeException(
                 'Unable to decrypt the obfuscated image paths :('

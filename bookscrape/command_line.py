@@ -1,6 +1,8 @@
 import os
 
 import click
+import cfscrape
+from lxml.html import document_fromstring
 from scrapy import signals
 from scrapy import spiderloader
 from scrapy.settings import Settings
@@ -8,6 +10,7 @@ from scrapy.crawler import Crawler, CrawlerRunner
 from scrapy.spiders import CrawlSpider
 from scrapy.utils.log import configure_logging
 from twisted.internet import reactor, defer
+from typing import Iterable
 
 from bookscrape.crawl.exporters import PdfExporter
 from bookscrape.exceptions import BookScrapeException
@@ -47,16 +50,12 @@ def _available_spiders() -> dict:
 class BookCrawler:
     """Crawl the provided book, exporting the crawled images"""
 
-    def __init__(self,
-                 provider: CrawlSpider,
-                 slug: str,
-                 volumes: range,
-                 output_dir: str,
-                 verbose=False):
+    exporter = None
+
+    def __init__(self, provider: CrawlSpider, slug: str, output_dir: str, verbose=False):
 
         self.provider = provider
         self.slug = slug
-        self.volumes = list(volumes)
         self.output_dir = output_dir
         self.verbose = verbose
 
@@ -64,22 +63,52 @@ class BookCrawler:
             configure_logging()
 
         self.runner = CrawlerRunner()
-        self.exporter = PdfExporter(
-            output_dir,
-            os.path.join(output_dir, 'images'),
-            file_name='%s_%s.pdf' % (
-                slug,
-                '-'.join([str(volumes.start), str(volumes.stop - 1)])
-            )
+
+    def get_volumes_links(self) -> Iterable[str]:
+        """Get the available list of volumes links for the wanted book slug"""
+
+        scraper = cfscrape.create_scraper()
+        book_url = (
+            f'http://{self.provider.allowed_domains[0]}/'
+            f'{self.provider.url_key}/{self.slug}'
         )
 
-    def run(self):
+        response = scraper.get(book_url)
+        document = document_fromstring(response.text)
+        volume_elements = document.xpath('//table[@class="listing"]//tr[position()>2]')
+
+        if not volume_elements:
+            raise BookScrapeException('No volumes found for the "%s" slug' % self.slug)
+
+        volumes = []
+
+        for index, volume_element in enumerate(volume_elements):
+            volume_link = volume_element.xpath(
+                './td[1]/a/@href'
+            )[0]
+            volumes.append(volume_link)
+
+        volumes.reverse()
+
+        return volumes
+
+    def run(self, volume_start: int, volume_end: int):
+        self.exporter = PdfExporter(
+            self.output_dir,
+            os.path.join(self.output_dir, 'images'),
+            file_name='%s_%s.pdf' % (
+                self.slug,
+                '-'.join([str(volume_start), str(volume_end)])
+            )
+        )
         logger.info(
             'Crawling started for the book slug "%s" on the "%s" provider.',
             self.slug,
             self.provider.name
         )
-        self.crawl()
+
+        volumes_list = list(range(volume_start, volume_end + 1))
+        self.crawl(volumes_list)
         reactor.run()
 
     @staticmethod
@@ -89,7 +118,7 @@ class BookCrawler:
         else:
             logger.error(failure)
 
-    def _get_crawler(self):
+    def _get_crawler(self) -> Crawler:
         crawler = Crawler(self.provider, settings={
             'IMAGES_STORE': os.path.join(self.output_dir, 'images'),
             **SETTINGS
@@ -106,49 +135,47 @@ class BookCrawler:
         return crawler
 
     @defer.inlineCallbacks
-    def crawl(self):
-        with click.progressbar(self.volumes) as bar:
-            for volume in bar:
-                yield self.runner.crawl(
-                    self._get_crawler(),
-                    book_slug=self.slug,
-                    volume=volume,
-                    output_dir=self.output_dir
-                )
+    def crawl(self, volumes: Iterable[int]):
+        yield self.runner.crawl(
+            self._get_crawler(),
+            book_slug=self.slug,
+            volumes=volumes
+        )
 
         reactor.stop()
         self.exporter.finish_exporting()
 
 
-class RangeParamType(click.ParamType):
-    name = 'range'
-
-    def convert(self, value, param, ctx):
-        try:
-            ranges = value.split('-')
-            start = int(ranges[0])
-            end = int(ranges[1]) if len(ranges) > 1 else start
-            return range(start, end + 1)
-        except ValueError:
-            self.fail('%s is not a valid range' % value, param, ctx)
-
-RANGE = RangeParamType()
-
-
 @click.command()
 @click.argument('provider', type=click.Choice(_available_spiders().keys()))
 @click.argument('book_slug')
-@click.argument('volumes', type=RANGE)
 @click.argument('output_dir', type=click.Path(exists=True))
 @click.option('--verbose', is_flag=True)
-def main(provider, book_slug, volumes, output_dir, verbose):
-    BookCrawler(
+def main(provider, book_slug, output_dir, verbose):
+    book_crawler = BookCrawler(
         _available_spiders()[provider],
         book_slug,
-        volumes,
         output_dir,
         verbose
-    ).run()
+    )
+
+    click.echo(f'Fetching the available volumes for the "{book_crawler.slug}" book...')
+
+    try:
+        volumes_list = book_crawler.get_volumes_links()
+    except BookScrapeException:
+        raise click.ClickException(
+            f'Failed to parse the volumes list '
+            f'for the "{book_crawler.slug}" book.'
+            f' Is the slug correct ?',
+        )
+
+    click.echo(f'{len(volumes_list)} volume(s) available for the "{book_crawler.slug}" book')
+
+    volumes_start = click.prompt('Starting volume ?', type=int)
+    volumes_end = click.prompt('Ending volume ?', type=int)
+
+    book_crawler.run(volumes_start, volumes_end)
 
 
 if __name__ == "__main__":
