@@ -1,6 +1,7 @@
 """This module contains the base spider classes"""
 
 import cfscrape
+from typing import Iterable
 
 from scrapy import spiders
 
@@ -34,22 +35,10 @@ class CloudFlareSpider(spiders.CrawlSpider):
 class BookSpider(spiders.CrawlSpider):
     """Base class for all the spiders outputting a ``BookPageItem``"""
 
-    def __init__(self, book_slug, volume, output_dir, *args, **kwargs):
-        """Init the spider with the start url
-
-        Parameters
-        ----------
-        book_slug: str
-            The slug of the wanted book on the "kissmanga" website
-        volume: str
-            The volume of the wanted book on the "kissmanga" website
-        output_dir: str
-            The path of the directory to place the downloaded files
-
-        """
+    def __init__(self, book_slug: str, volumes: Iterable[int], *args, **kwargs):
+        """Init the spider with the provided arguments"""
 
         super().__init__(*args, **kwargs)
 
         self.book_slug = book_slug
-        self.volume = int(volume)
-        self.output_dir = output_dir
+        self.volumes = volumes

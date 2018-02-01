@@ -43,59 +43,39 @@ class TestCommandLine(unittest.TestCase):
         self.assertEqual(result.exit_code, 2)
         self.assertEqual(
             result.output,
-            'Usage: main [OPTIONS] PROVIDER BOOK_SLUG VOLUMES OUTPUT_DIR\n'
+            'Usage: main [OPTIONS] PROVIDER BOOK_SLUG OUTPUT_DIR\n'
             '\n'
             'Error: Missing argument "provider".  Choose from kissmanga, readcomiconline.\n'
         )
-
-    def test_main_should_call_the_crawl_command(self):
-        """Test that the ``main`` method should call the ``crawl`` method with the corrects args"""
-
-        # With only one volume
-        with mock.patch.object(BookCrawler, '__init__') as mocked:
-            self.runner.invoke(main, ['kissmanga', 'Akira', '1', '/'])
-        mocked.assert_called_with(KissmangaSpider, 'Akira', range(1, 2), '/', False)
-
-        # With two volumes
-        with mock.patch.object(BookCrawler, '__init__') as mocked:
-            self.runner.invoke(main, ['kissmanga', 'Akira', '1-2', '/'])
-        mocked.assert_called_with(KissmangaSpider, 'Akira', range(1, 3), '/', False)
 
     @mock.patch('twisted.internet.reactor.run')
     @mock.patch.object(BookCrawler, '_get_crawler', return_value=None)
     def test_crawl_should_call_the_crawl_method_on_the_crawler_runner(self, mocked_crawler, mocked_run):
         """Test that the ``crawl`` method should call the ``CrawlerRunner.crawl``"""
 
-        bookcrawler = BookCrawler(KissmangaSpider, 'Akira', range(1, 2), '/')
+        bookcrawler = BookCrawler(KissmangaSpider, 'Akira', '/')
 
         with mock.patch('scrapy.crawler.CrawlerRunner.crawl') as mocked_crawl:
-            bookcrawler.run()
+            bookcrawler.run(1, 1)
 
         # The crawl method should be called
         mocked_crawl.assert_called_once_with(
             bookcrawler._get_crawler(),
             book_slug='Akira',
-            volume=1,
-            output_dir='/'
+            volumes=[1]
         )
 
         # The twisted reactor should be launched
         mocked_run.assert_called_once_with()
 
-        bookcrawler = BookCrawler(KissmangaSpider, 'Akira', range(1, 3), '/')
+        bookcrawler = BookCrawler(KissmangaSpider, 'Akira', '/')
 
         # If we want to get two volumes, the crawl method should be called twice
         with mock.patch('scrapy.crawler.CrawlerRunner.crawl') as mocked_crawl:
-            bookcrawler.run()
+            bookcrawler.run(1, 2)
 
-        calls = [
-            mock.call(
-                bookcrawler._get_crawler(),
-                book_slug='Akira',
-                volume=i,
-                output_dir='/'
-            )
-            for i in range(1, 3)
-        ]
-
-        mocked_crawl.assert_has_calls(calls)
+        mocked_crawl.assert_called_once_with(
+            bookcrawler._get_crawler(),
+            book_slug='Akira',
+            volumes=[1, 2]
+        )
