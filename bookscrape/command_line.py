@@ -12,9 +12,9 @@ from scrapy.utils.log import configure_logging
 from twisted.internet import reactor, defer
 from typing import Iterable
 
-from bookscrape.crawl.exporters import PdfExporter
-from bookscrape.exceptions import BookScrapeException
-from bookscrape.loggers import logger
+from .crawl.exporters import PdfExporter
+from .exceptions import BookScrapeException
+from .loggers import logger
 
 
 SETTINGS = {
