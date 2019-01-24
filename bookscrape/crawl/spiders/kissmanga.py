@@ -34,7 +34,7 @@ class KissmangaSpider(KissmangaReadcomicsBase):
         dec = AES.new(key=key, mode=AES.MODE_CBC, IV=iv)
         result = dec.decrypt(encoded)
 
-        return result.decode('utf-8').replace('\x10', '')
+        return result.decode('utf-8').replace('\x10', '').replace('\x03', '')
 
     def _get_decode_key(self, response) -> bytes:
         """Get the key to decode the obfuscated images"""
